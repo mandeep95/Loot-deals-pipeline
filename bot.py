@@ -18,13 +18,22 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from affiliate import get_converter
-from format_post import build_approval_card, build_post, build_simple_post, deal_title
+from ai_enhance import enhance_post
+from format_post import (
+    build_approval_card,
+    build_post,
+    build_simple_post,
+    deal_title,
+    inr,
+)
 from patterns import (
     NON_PRODUCT_HOSTS,
     extract_all_urls,
+    extract_discount_pct,
     extract_prices,
     extract_product_urls,
     is_loot,
+    price_drop_pct,
 )
 from verify import verify_alive
 
@@ -104,21 +113,47 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     title = deal_title(text)
     photo_id = msg.photo[-1].file_id if msg.photo else None
 
+    prices = extract_prices(text)
+    pct = extract_discount_pct(text) or price_drop_pct(prices)
+
     if matched:
         # Loot path: full formatting + live-price verification.
-        post = build_post(title, text, affiliate_url)
-        prices = extract_prices(text)
+        template_post = build_post(title, text, affiliate_url)
         expected = min(prices) if prices else None
         status, note = verify_alive(url, expected)
         verdict_icon = {"alive": "🟢", "dead": "🔴", "unknown": "🟡"}[status]
+        deal_info = ""
+        if prices and len(prices) >= 2:
+            deal_info = f"Price {inr(min(prices))} (was {inr(max(prices))})"
+        elif prices:
+            deal_info = f"Price {inr(prices[0])}"
+        if pct:
+            deal_info += f", {pct}% {'CASHBACK' if 'cashback' in text.lower() else 'OFF'}"
+    else:
+        # Simple-deal path: user forwarded it, so post it plainly.
+        template_post = build_simple_post(title, affiliate_url)
+        status, note, deal_info = None, "", ""
+
+    # AI enhancement (fail-open): rewrite the body, affiliate link appended
+    # afterwards so the model can never mangle it. HTML-escape AI text.
+    ai_body = enhance_post(text, title, deal_info.strip(", "))
+    if ai_body:
+        import html as _html
+
+        post = _html.escape(ai_body) + f"\n\n🛒 <a href=\"{affiliate_url}\">Grab the deal here</a>"
+        preview_label = "<i>Preview (✨ AI-enhanced):</i>"
+    else:
+        post = template_post
+        preview_label = "<i>Preview:</i>"
+
+    if matched:
         card = build_approval_card(title, reasons, post)
         card += f"\n\n{verdict_icon} <b>Live check:</b> {note}"
         if status == "dead":
             card += "\n<i>Tip: this one looks expired — Reject is probably right.</i>"
     else:
-        # Simple-deal path: user forwarded it, so post it plainly.
-        post = build_simple_post(title, affiliate_url)
         card = build_approval_card(title, reasons, post, simple=True)
+    card = card.replace("<i>Preview:</i>", preview_label)
 
     token = f"{msg.message_id}"
     PENDING[token] = (url, post, photo_id)
