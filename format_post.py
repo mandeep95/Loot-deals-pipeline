@@ -47,6 +47,8 @@ def build_approval_card(title: str, reasons: dict, post_preview: str) -> str:
         why.append(f"{reasons['explicit_pct']}% off stated")
     if reasons.get("price_drop_pct"):
         why.append(f"~{reasons['price_drop_pct']}% price drop detected")
+    if reasons.get("unverified_url"):
+        why.append("shortened link (will resolve on verify)")
     return (
         f"🕵️ <b>New loot candidate</b>\n"
         f"<b>{title.strip()}</b>\n"
