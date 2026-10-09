@@ -54,8 +54,11 @@ _loop: asyncio.AbstractEventLoop | None = None
 def _load_approvals() -> None:
     try:
         with open(APPROVALS_FILE) as f:
-            for token, post in json.load(f).items():
-                bot_handlers.PENDING.setdefault(token, ("", post))
+            for token, item in json.load(f).items():
+                if isinstance(item, str):  # legacy format
+                    item = {"post": item, "photo_id": None}
+                bot_handlers.PENDING.setdefault(
+                    token, ("", item["post"], item.get("photo_id")))
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
@@ -63,7 +66,8 @@ def _load_approvals() -> None:
 def _save_approvals() -> None:
     try:
         with open(APPROVALS_FILE, "w") as f:
-            json.dump({t: post for t, (_u, post) in bot_handlers.PENDING.items()}, f)
+            json.dump({t: {"post": post, "photo_id": ph}
+                       for t, (_u, post, ph) in bot_handlers.PENDING.items()}, f)
     except OSError:
         pass
 
