@@ -11,8 +11,8 @@ import re
 PRICE_RE = re.compile(
     r"(?:₹|Rs\.?|INR)\s?([\d,]+(?:\.\d{1,2})?)", re.IGNORECASE
 )
-# "90% off", "flat 80% discount"
-PCT_RE = re.compile(r"(\d{1,3})\s?%\s?(?:off|discount)", re.IGNORECASE)
+# "90% off", "flat 80% discount", "90% cashback"
+PCT_RE = re.compile(r"(\d{1,3})\s?%\s?(?:off|discount|cashback)", re.IGNORECASE)
 # plain URLs
 URL_RE = re.compile(r"https?://[^\s)>\]]+")
 # known Indian storefront hosts (substring match)
@@ -24,7 +24,7 @@ STOREFRONTS = (
 # shorteners / affiliate domains loot channels love — resolved later by verify.py
 SHORT_DOMAINS = (
     "bit.ly", "tinyurl.com", "cutt.ly", "t.ly", "is.gd", "shorturl.at",
-    "amzn.to", "amzn.in", "fkrt.it", "myntr.it", "ajio.link",
+    "amzn.to", "amzn.in", "fkrt.it", "fkm.asia", "myntr.it", "ajio.link",
     "earnkaro", "cuelinks",
 )
 # never treat these as product links
@@ -74,7 +74,7 @@ def extract_product_urls(text: str) -> list[str]:
 
 
 def load_keywords() -> list[str]:
-    raw = os.getenv("LOOT_KEYWORDS", "loot,price error,priceerror,glitch,steal deal")
+    raw = os.getenv("LOOT_KEYWORDS", "loot,price error,priceerror,glitch,steal deal,cashback")
     return [k.strip().lower() for k in raw.split(",") if k.strip()]
 
 
