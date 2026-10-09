@@ -18,7 +18,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from affiliate import get_converter
-from format_post import build_approval_card, build_post, deal_title
+from format_post import build_approval_card, build_post, build_simple_post, deal_title
 from patterns import extract_prices, extract_product_urls, is_loot
 from verify import verify_alive
 
@@ -66,7 +66,8 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     matched, reasons = is_loot(text)
     urls = reasons.get("product_urls") or extract_product_urls(text)
-    if not matched or not urls:
+    if not urls:
+        # No link at all — nothing we can post. Keep the diagnostic skip.
         sig = reasons.get("signals", {})
         seen = []
         if sig.get("keyword"):
@@ -77,14 +78,10 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             seen.append(f"~{sig['price_drop_pct']}% price drop")
         if sig.get("prices"):
             seen.append("prices " + "/".join(f"₹{int(p):,}" for p in sig["prices"][:4]))
-        if sig.get("urls"):
-            seen.append(f"{len(sig['urls'])} link(s)")
         detail = ("I saw: " + ", ".join(seen)) if seen else "I couldn't find a deal pattern in it"
-        hint = ("If the deal is inside an image with no text, forward the product link along with it."
-                if not sig.get("urls") else
-                "Try forwarding with the product link as plain text.")
         await msg.reply_text(
-            f"Skipped — doesn't look like a loot deal. {detail}.\n{hint}")
+            f"Skipped — no product link found. {detail}.\n"
+            "Forward the message with the product link as plain text.")
         return
 
     url = urls[0]
@@ -94,21 +91,26 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     affiliate_url = converter.convert(url)
     title = deal_title(text)
-    post = build_post(title, text, affiliate_url)
+    photo_id = msg.photo[-1].file_id if msg.photo else None
 
-    # verify-alive: is the loot price still on the page? (fail-open)
-    prices = extract_prices(text)
-    expected = min(prices) if prices else None
-    status, note = verify_alive(url, expected)
-    verdict_icon = {"alive": "🟢", "dead": "🔴", "unknown": "🟡"}[status]
+    if matched:
+        # Loot path: full formatting + live-price verification.
+        post = build_post(title, text, affiliate_url)
+        prices = extract_prices(text)
+        expected = min(prices) if prices else None
+        status, note = verify_alive(url, expected)
+        verdict_icon = {"alive": "🟢", "dead": "🔴", "unknown": "🟡"}[status]
+        card = build_approval_card(title, reasons, post)
+        card += f"\n\n{verdict_icon} <b>Live check:</b> {note}"
+        if status == "dead":
+            card += "\n<i>Tip: this one looks expired — Reject is probably right.</i>"
+    else:
+        # Simple-deal path: user forwarded it, so post it plainly.
+        post = build_simple_post(title, affiliate_url)
+        card = build_approval_card(title, reasons, post, simple=True)
 
     token = f"{msg.message_id}"
-    photo_id = msg.photo[-1].file_id if msg.photo else None
     PENDING[token] = (url, post, photo_id)
-    card = build_approval_card(title, reasons, post)
-    card += f"\n\n{verdict_icon} <b>Live check:</b> {note}"
-    if status == "dead":
-        card += "\n<i>Tip: this one looks expired — Reject is probably right.</i>"
     await msg.reply_text(card, parse_mode="HTML", reply_markup=_kb(token),
                          disable_web_page_preview=True)
 
