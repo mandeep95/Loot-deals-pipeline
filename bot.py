@@ -29,8 +29,8 @@ log = logging.getLogger("deals-bot")
 DRAFT_CHAT_ID = int(os.environ["DRAFT_CHAT_ID"])
 DEALS_CHANNEL = os.environ["DEALS_CHANNEL"]
 
-# pending approvals: token -> (product_url, final post text)
-PENDING: dict[str, tuple[str, str]] = {}
+# pending approvals: token -> (product_url, final post text, photo file_id or None)
+PENDING: dict[str, tuple[str, str, str | None]] = {}
 # de-dupe: product URL -> True (don't repost the same loot twice)
 SEEN_URLS: set[str] = set()
 
@@ -103,7 +103,8 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     verdict_icon = {"alive": "🟢", "dead": "🔴", "unknown": "🟡"}[status]
 
     token = f"{msg.message_id}"
-    PENDING[token] = (url, post)
+    photo_id = msg.photo[-1].file_id if msg.photo else None
+    PENDING[token] = (url, post, photo_id)
     card = build_approval_card(title, reasons, post)
     card += f"\n\n{verdict_icon} <b>Live check:</b> {note}"
     if status == "dead":
@@ -120,10 +121,15 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if item is None:
         await query.edit_message_text("This approval expired.")
         return
-    url, post = item
+    url, post, photo_id = item
     if action == "ok":
-        await context.bot.send_message(DEALS_CHANNEL, post, parse_mode="HTML",
-                                       disable_web_page_preview=False)
+        if photo_id:
+            # keep the product image: photo + formatted caption (not text-only)
+            await context.bot.send_photo(DEALS_CHANNEL, photo=photo_id,
+                                         caption=post, parse_mode="HTML")
+        else:
+            await context.bot.send_message(DEALS_CHANNEL, post, parse_mode="HTML",
+                                           disable_web_page_preview=False)
         SEEN_URLS.add(url)  # don't repost the same product twice
         await query.edit_message_text("✅ Posted to your channel.")
         log.info("Posted a deal to %s", DEALS_CHANNEL)
