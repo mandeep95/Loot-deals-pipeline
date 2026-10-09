@@ -124,6 +124,12 @@ check("simple post has title + link, no LOOT header",
 card = build_approval_card("Noise Buds", {}, sp, simple=True)
 check("simple approval card marked as simple deal", "simple deal" in card.lower())
 
+print("== ai enhancement (fail-open) ==")
+import ai_enhance as _ai  # noqa: E402
+
+os.environ.pop("GROQ_API_KEY", None)
+check("no key -> None (template fallback)", _ai.enhance_post("x", "y") is None)
+
 print("== unknown shorteners ==")
 
 check("link.amazon accepted",
