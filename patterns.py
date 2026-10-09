@@ -24,8 +24,8 @@ STOREFRONTS = (
 # shorteners / affiliate domains loot channels love — resolved later by verify.py
 SHORT_DOMAINS = (
     "bit.ly", "tinyurl.com", "cutt.ly", "t.ly", "is.gd", "shorturl.at",
-    "amzn.to", "amzn.in", "fkrt.it", "fkm.asia", "myntr.it", "ajio.link",
-    "earnkaro", "cuelinks",
+    "amzn.to", "amzn.in", "link.amazon", "fkrt.it", "fkrt.site", "fkm.asia",
+    "myntr.it", "ajio.link", "earnkaro", "cuelinks",
 )
 # never treat these as product links
 NON_PRODUCT_HOSTS = ("t.me", "telegram.me", "youtube.com", "youtu.be")
