@@ -28,7 +28,9 @@ from format_post import (
 )
 from patterns import (
     NON_PRODUCT_HOSTS,
+    cashback_deal,
     extract_all_urls,
+    extract_coupon,
     extract_discount_pct,
     extract_prices,
     extract_product_urls,
@@ -123,12 +125,19 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         status, note = verify_alive(url, expected)
         verdict_icon = {"alive": "🟢", "dead": "🔴", "unknown": "🟡"}[status]
         deal_info = ""
-        if prices and len(prices) >= 2:
-            deal_info = f"Price {inr(min(prices))} (was {inr(max(prices))})"
-        elif prices:
-            deal_info = f"Price {inr(prices[0])}"
-        if pct:
-            deal_info += f", {pct}% {'CASHBACK' if 'cashback' in text.lower() else 'OFF'}"
+        cb_price, cb_amt, cb_pct = cashback_deal(text)
+        coupon = extract_coupon(text)
+        if cb_pct is not None:
+            deal_info = f"Price {inr(cb_price)}, {cb_pct}% CASHBACK ({inr(cb_amt)} back)"
+        else:
+            if prices and len(prices) >= 2:
+                deal_info = f"Price {inr(min(prices))} (was {inr(max(prices))})"
+            elif prices:
+                deal_info = f"Price {inr(prices[0])}"
+            if pct:
+                deal_info += f", {pct}% {'CASHBACK' if 'cashback' in text.lower() else 'OFF'}"
+        if coupon:
+            deal_info += f", {inr(coupon)} off coupon"
     else:
         # Simple-deal path: user forwarded it, so post it plainly.
         template_post = build_simple_post(title, affiliate_url)
