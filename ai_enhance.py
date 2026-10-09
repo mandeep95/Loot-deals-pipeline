@@ -6,10 +6,16 @@ when no key is configured) and the caller falls back to the template post.
 
 The affiliate link is NEVER given to the AI — it's appended afterwards, so
 the model can't mangle or hallucinate URLs.
+
+Uses only the standard library (urllib) so there's no extra dependency.
+Failures are logged to stderr (visible in Render logs) for debugging.
 """
 from __future__ import annotations
 
+import json
 import os
+import sys
+import urllib.request
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")  # fast + free
@@ -25,35 +31,45 @@ Rules:
 - Match the input language (English or Hinglish)."""
 
 
+def _log(msg: str) -> None:
+    print(f"[ai_enhance] {msg}", file=sys.stderr, flush=True)
+
+
 def enhance_post(raw_text: str, title: str, deal_info: str = "") -> str | None:
     """Return AI-rewritten post body, or None to use the template instead."""
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         return None
     try:
-        import httpx  # local import: module stays importable without it
-
         prompt = (
             f"Product: {title}\n"
             + (f"Deal facts: {deal_info}\n" if deal_info else "")
             + f"\nRaw message:\n{(raw_text or '')[:1500]}"
         )
-        r = httpx.post(
+        body = json.dumps({
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 400,
+        }).encode()
+        req = urllib.request.Request(
             GROQ_URL,
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": MODEL,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.7,
-                "max_tokens": 400,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
             },
-            timeout=25.0,
         )
-        r.raise_for_status()
-        text = (r.json()["choices"][0]["message"]["content"] or "").strip()
-        return text if text else None
-    except Exception:
+        with urllib.request.urlopen(req, timeout=25) as r:
+            data = json.load(r)
+        text = (data["choices"][0]["message"]["content"] or "").strip()
+        if not text:
+            _log("empty response from Groq")
+            return None
+        return text
+    except Exception as e:  # fail-open: template post is used instead
+        _log(f"failed: {type(e).__name__}: {str(e)[:200]}")
         return None
