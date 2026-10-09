@@ -154,8 +154,14 @@ async def main() -> None:
     app.add_handler(CallbackQueryHandler(on_button))
     await app.initialize()
     await app.start()
-    await app.bot.set_webhook(f"{WEBHOOK_URL}/telegram")
-    log.info("Webhook set to %s/telegram", WEBHOOK_URL)
+    # Webhook ownership: only claim the bot's webhook when explicitly enabled.
+    # The user chose Sankmo's autopost for posting, so by default we must NOT
+    # steal the webhook back from sankmo.in on every deploy/restart.
+    if os.environ.get("MANAGE_WEBHOOK", "0") == "1":
+        await app.bot.set_webhook(f"{WEBHOOK_URL}/telegram")
+        log.info("Webhook set to %s/telegram", WEBHOOK_URL)
+    else:
+        log.info("MANAGE_WEBHOOK not set — leaving existing webhook untouched")
     _loop = asyncio.get_running_loop()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     log.info("Serving on port %d", PORT)
