@@ -99,6 +99,22 @@ check("loot with ONLY a short link matches",
 check("unverified_url reason set for short link",
       is_loot("LOOT ₹499 https://bit.ly/3x")[1].get("unverified_url") is True)
 
+print("== cashback loots ==")
+
+check("90% cashback detected as pct",
+      extract_discount_pct("Grab Them at 90% Cashback") == 90)
+
+check("fkm.asia accepted as product url",
+      extract_product_urls("buy https://fkm.asia/4ykj now") == ["https://fkm.asia/4ykj"])
+
+check("cashback loot post matches",
+      is_loot("🚨Grab Them at 90% Cashback\nBrillare X Amazon Offer live\n"
+              "Tea Tree Shampoo - https://fkm.asia/4ykj")[0] is True)
+
+post_cb = build_post("Brillare Shampoo", "Grab at 90% Cashback https://fkm.asia/4ykj",
+                     "https://aff.link/x")
+check("cashback post shows CASHBACK label", "90% CASHBACK" in post_cb)
+
 print("== verify-alive (logic, network stubbed) ==")
 import types  # noqa: E402
 
