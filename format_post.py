@@ -27,6 +27,7 @@ def build_post(title: str, original_text: str, affiliate_url: str) -> str:
     """Build the channel-ready message. Pure function, unit-tested."""
     prices = extract_prices(original_text)
     pct = extract_discount_pct(original_text) or price_drop_pct(prices)
+    is_cashback = "cashback" in (original_text or "").lower()
 
     lines = ["🔥 <b>LOOT DEAL</b> 🔥", "", f"<b>{title.strip()}</b>", ""]
     if len(prices) >= 2:
@@ -34,7 +35,8 @@ def build_post(title: str, original_text: str, affiliate_url: str) -> str:
     elif prices:
         lines.append(f"💰 <b>{inr(prices[0])}</b>")
     if pct:
-        lines.append(f"📉 <b>{pct}% OFF</b>")
+        label = "CASHBACK" if is_cashback else "OFF"
+        lines.append(f"📉 <b>{pct}% {label}</b>")
     lines += ["", f"🛒 <a href=\"{affiliate_url}\">Grab the deal here</a>", "", "⚡ <i>Loot deals die fast — order quickly!</i>"]
     return "\n".join(lines)
 
