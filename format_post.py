@@ -41,7 +41,22 @@ def build_post(title: str, original_text: str, affiliate_url: str) -> str:
     return "\n".join(lines)
 
 
-def build_approval_card(title: str, reasons: dict, post_preview: str) -> str:
+def build_simple_post(title: str, affiliate_url: str) -> str:
+    """Plain deal post for forwards that didn't match a loot pattern."""
+    return (
+        f"<b>{title.strip()}</b>\n\n"
+        f"🛒 <a href=\"{affiliate_url}\">Grab the deal here</a>"
+    )
+
+
+def build_approval_card(title: str, reasons: dict, post_preview: str,
+                        simple: bool = False) -> str:
+    if simple:
+        return (
+            f"📦 <b>New deal</b> (no loot pattern matched — posting as simple deal)\n"
+            f"<b>{title.strip()}</b>\n\n"
+            f"<i>Preview:</i>\n{post_preview}"
+        )
     why = []
     if reasons.get("keyword"):
         why.append(f"keyword: “{reasons['keyword']}”")
