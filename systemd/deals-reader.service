@@ -1,0 +1,15 @@
+[Unit]
+Description=Loot-deals channel reader (Telethon userbot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/deals-pipeline
+ExecStart=/home/ubuntu/deals-pipeline/.venv/bin/python reader.py
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
