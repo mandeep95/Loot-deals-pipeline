@@ -20,6 +20,8 @@ STOREFRONTS = (
     "amazon.in", "flipkart.com", "myntra.com", "ajio.com",
     "croma.com", "reliance", "tatacliq.com", "nykaa.com",
     "meesho.com", "snapdeal.com", "vijaysales.com",
+    "blinkit.com", "swiggy.com", "zeptonow.com",
+    "bigbasket.com", "jiomart.com",
 )
 # shorteners / affiliate domains loot channels love — resolved later by verify.py
 SHORT_DOMAINS = (
