@@ -67,7 +67,24 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     matched, reasons = is_loot(text)
     urls = reasons.get("product_urls") or extract_product_urls(text)
     if not matched or not urls:
-        await msg.reply_text("Doesn't look like a loot deal (no loot pattern or no product link). Skipping.")
+        sig = reasons.get("signals", {})
+        seen = []
+        if sig.get("keyword"):
+            seen.append(f"keyword “{sig['keyword']}”")
+        if sig.get("explicit_pct"):
+            seen.append(f"{sig['explicit_pct']}% off")
+        if sig.get("price_drop_pct"):
+            seen.append(f"~{sig['price_drop_pct']}% price drop")
+        if sig.get("prices"):
+            seen.append("prices " + "/".join(f"₹{int(p):,}" for p in sig["prices"][:4]))
+        if sig.get("urls"):
+            seen.append(f"{len(sig['urls'])} link(s)")
+        detail = ("I saw: " + ", ".join(seen)) if seen else "I couldn't find a deal pattern in it"
+        hint = ("If the deal is inside an image with no text, forward the product link along with it."
+                if not sig.get("urls") else
+                "Try forwarding with the product link as plain text.")
+        await msg.reply_text(
+            f"Skipped — doesn't look like a loot deal. {detail}.\n{hint}")
         return
 
     url = urls[0]
