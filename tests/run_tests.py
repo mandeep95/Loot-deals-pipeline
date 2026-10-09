@@ -115,6 +115,15 @@ post_cb = build_post("Brillare Shampoo", "Grab at 90% Cashback https://fkm.asia/
                      "https://aff.link/x")
 check("cashback post shows CASHBACK label", "90% CASHBACK" in post_cb)
 
+print("== simple deals ==")
+from format_post import build_simple_post, build_approval_card  # noqa: E402
+
+sp = build_simple_post("Noise Buds", "https://aff.link/x")
+check("simple post has title + link, no LOOT header",
+      "Noise Buds" in sp and "https://aff.link/x" in sp and "LOOT" not in sp)
+card = build_approval_card("Noise Buds", {}, sp, simple=True)
+check("simple approval card marked as simple deal", "simple deal" in card.lower())
+
 print("== verify-alive (logic, network stubbed) ==")
 import types  # noqa: E402
 
