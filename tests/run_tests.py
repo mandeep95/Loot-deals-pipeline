@@ -124,6 +124,39 @@ check("simple post has title + link, no LOOT header",
 card = build_approval_card("Noise Buds", {}, sp, simple=True)
 check("simple approval card marked as simple deal", "simple deal" in card.lower())
 
+print("== cashback math ==")
+from patterns import cashback_amount, cashback_deal, extract_coupon  # noqa: E402
+from format_post import build_post  # noqa: E402
+
+S25 = ("Samsung Galaxy S25 Ultra (12GB + 256GB) at ₹84,999\n"
+       "Apply ₹10,000 off Coupon\nLink: https://amzn.to/4boKpo4\n"
+       "Extra ₹4,249 Cashback with Amazon ICICI Credit Cards")
+price, cb_amt, cb_pct = cashback_deal(S25)
+check("cashback price is 84999", price == 84999)
+check("cashback amount is 4249", cb_amt == 4249)
+check("cashback pct is 5, not 95", cb_pct == 5)
+check("coupon extracted", extract_coupon(S25) == 10000)
+
+post = build_post("Samsung Galaxy S25 Ultra", S25, "https://x")
+check("post shows real price 84,999", "₹84,999" in post)
+check("post shows 5% CASHBACK", "5% CASHBACK" in post)
+check("post does NOT show fake 95%", "95%" not in post)
+check("post does NOT price it at 4,249", "₹4,249</b>" not in post)
+check("post mentions coupon", "coupon" in post.lower())
+check("post mentions cashback amount", "₹4,249" in post)
+
+m, r = is_loot("LOOT " + S25)
+check("no spurious price_drop_pct reason", r.get("price_drop_pct") is None)
+check("cashback_pct reason present", r.get("cashback_pct") == 5)
+
+# sanity: genuine price drops still work
+m2, r2 = is_loot("LOOT boAt buds MRP ₹4,999 at ₹499 https://amzn.to/x")
+check("real price drop still detected", r2.get("price_drop_pct") == 90)
+
+# sanity: '% cashback' with no amount nearby -> no fake math
+m3, r3 = is_loot("LOOT deal at ₹999, 10% cashback https://amzn.to/x")
+check("pct-only cashback has no cashback_deal", cashback_deal("deal at ₹999, 10% cashback") == (None, None, None))
+
 print("== ai enhancement (fail-open) ==")
 import ai_enhance as _ai  # noqa: E402
 
