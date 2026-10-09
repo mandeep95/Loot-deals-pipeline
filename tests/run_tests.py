@@ -82,6 +82,23 @@ check("post carries affiliate link", "https://aff.link/abc" in post)
 check("deal_title picks first text line",
       deal_title("boAt Airdopes LOOT\n₹499 only\nhttps://x") == "boAt Airdopes LOOT")
 
+print("== short/affiliate links ==")
+
+check("bit.ly link accepted as product url",
+      extract_product_urls("Loot! ₹499 https://bit.ly/3xyzAB") == ["https://bit.ly/3xyzAB"])
+
+check("amzn.to link accepted",
+      extract_product_urls("deal https://amzn.to/4abc") == ["https://amzn.to/4abc"])
+
+check("t.me link never a product url",
+      extract_product_urls("join https://t.me/somechannel") == [])
+
+check("loot with ONLY a short link matches",
+      is_loot("🔥 LOOT 🔥 boAt Airdopes MRP ₹4,999 at ₹499 👉 https://bit.ly/3xyzAB")[0] is True)
+
+check("unverified_url reason set for short link",
+      is_loot("LOOT ₹499 https://bit.ly/3x")[1].get("unverified_url") is True)
+
 print("== verify-alive (logic, network stubbed) ==")
 import types  # noqa: E402
 
