@@ -124,6 +124,14 @@ check("simple post has title + link, no LOOT header",
 card = build_approval_card("Noise Buds", {}, sp, simple=True)
 check("simple approval card marked as simple deal", "simple deal" in card.lower())
 
+print("== unknown shorteners ==")
+
+check("link.amazon accepted",
+      extract_product_urls("monitor https://link.amazon/B0crzKuKW") == ["https://link.amazon/B0crzKuKW"])
+
+check("fkrt.site accepted",
+      extract_product_urls("mat https://fkrt.site/6fU3nqE") == ["https://fkrt.site/6fU3nqE"])
+
 print("== verify-alive (logic, network stubbed) ==")
 import types  # noqa: E402
 
