@@ -21,6 +21,14 @@ STOREFRONTS = (
     "croma.com", "reliance", "tatacliq.com", "nykaa.com",
     "meesho.com", "snapdeal.com", "vijaysales.com",
 )
+# shorteners / affiliate domains loot channels love — resolved later by verify.py
+SHORT_DOMAINS = (
+    "bit.ly", "tinyurl.com", "cutt.ly", "t.ly", "is.gd", "shorturl.at",
+    "amzn.to", "amzn.in", "fkrt.it", "myntr.it", "ajio.link",
+    "earnkaro", "cuelinks",
+)
+# never treat these as product links
+NON_PRODUCT_HOSTS = ("t.me", "telegram.me", "youtube.com", "youtu.be")
 
 
 def _to_float(num: str) -> float:
@@ -38,13 +46,28 @@ def extract_discount_pct(text: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def extract_product_urls(text: str) -> list[str]:
-    """URLs that look like product pages on Indian storefronts."""
+def extract_all_urls(text: str) -> list[str]:
+    """Every http(s) URL in the text, cleaned of trailing chat punctuation."""
     urls = []
     for m in URL_RE.finditer(text or ""):
-        url = m.group(0).rstrip(".,;!")  # trailing punctuation from chat text
+        url = m.group(0).rstrip(".,;!)]}>\"'")
+        if url:
+            urls.append(url)
+    return list(dict.fromkeys(urls))
+
+
+def extract_product_urls(text: str) -> list[str]:
+    """URLs that look like product pages: storefront links plus short/affiliate
+    links (bit.ly, amzn.to, earnkaro …) which verify.py resolves by following
+    redirects. Telegram/YouTube links are never products."""
+    urls = []
+    for url in extract_all_urls(text):
         low = url.lower()
-        if any(host in low for host in STOREFRONTS):
+        if any(host in low for host in NON_PRODUCT_HOSTS):
+            continue
+        if any(host in low for host in STOREFRONTS) or any(
+            host in low for host in SHORT_DOMAINS
+        ):
             urls.append(url)
     # de-dupe, keep order
     return list(dict.fromkeys(urls))
@@ -99,8 +122,23 @@ def is_loot(text: str) -> tuple[bool, dict]:
         reasons["product_urls"] = urls
 
     matched = bool(reasons.get("keyword") or reasons.get("explicit_pct") or reasons.get("price_drop_pct"))
-    # A loot post without a product link is useless to us — require one.
+    # A loot post without any link is useless to us — require one.
     if matched and not urls:
-        matched = False
-        reasons["no_product_url"] = True
+        others = [u for u in extract_all_urls(text)
+                  if not any(h in u.lower() for h in NON_PRODUCT_HOSTS)]
+        if others:
+            urls = others
+            reasons["product_urls"] = urls
+        else:
+            matched = False
+            reasons["no_url"] = True
+    if urls and not any(any(h in u.lower() for h in STOREFRONTS) for u in urls):
+        reasons["unverified_url"] = True  # short/affiliate link: resolved on verify
+    reasons["signals"] = {
+        "keyword": reasons.get("keyword"),
+        "explicit_pct": reasons.get("explicit_pct"),
+        "price_drop_pct": reasons.get("price_drop_pct"),
+        "prices": extract_prices(text),
+        "urls": urls,
+    }
     return matched, reasons
