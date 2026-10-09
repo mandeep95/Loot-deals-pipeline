@@ -157,11 +157,24 @@ check("real price drop still detected", r2.get("price_drop_pct") == 90)
 m3, r3 = is_loot("LOOT deal at ₹999, 10% cashback https://amzn.to/x")
 check("pct-only cashback has no cashback_deal", cashback_deal("deal at ₹999, 10% cashback") == (None, None, None))
 
-print("== ai enhancement (fail-open) ==")
+print("== ai enhancement (fail-open, multi-provider) ==")
 import ai_enhance as _ai  # noqa: E402
 
-os.environ.pop("GROQ_API_KEY", None)
-check("no key -> None (template fallback)", _ai.enhance_post("x", "y") is None)
+for k in ("ZAI_API_KEY", "GROQ_API_KEY", "AI_PROVIDER"):
+    os.environ.pop(k, None)
+check("no keys -> no providers", _ai._provider_order() == [])
+check("no keys -> None (template fallback)", _ai.enhance_post("x", "y") is None)
+
+os.environ["GROQ_API_KEY"] = "dummy"
+check("groq only -> [groq]", _ai._provider_order() == ["groq"])
+os.environ["ZAI_API_KEY"] = "dummy"
+check("both keys -> zai first", _ai._provider_order() == ["zai", "groq"])
+os.environ["AI_PROVIDER"] = "groq"
+check("pinned groq", _ai._provider_order() == ["groq"])
+os.environ["AI_PROVIDER"] = "zai"
+check("pinned zai", _ai._provider_order() == ["zai"])
+for k in ("ZAI_API_KEY", "GROQ_API_KEY", "AI_PROVIDER"):
+    os.environ.pop(k, None)
 
 print("== unknown shorteners ==")
 
