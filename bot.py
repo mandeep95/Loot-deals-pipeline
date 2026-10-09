@@ -19,7 +19,13 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Cont
 
 from affiliate import get_converter
 from format_post import build_approval_card, build_post, build_simple_post, deal_title
-from patterns import extract_prices, extract_product_urls, is_loot
+from patterns import (
+    NON_PRODUCT_HOSTS,
+    extract_all_urls,
+    extract_prices,
+    extract_product_urls,
+    is_loot,
+)
 from verify import verify_alive
 
 load_dotenv()
@@ -66,6 +72,11 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     matched, reasons = is_loot(text)
     urls = reasons.get("product_urls") or extract_product_urls(text)
+    if not urls:
+        # Last resort: any non-Telegram URL at all (covers shorteners we
+        # haven't catalogued). Only truly link-less messages get skipped.
+        urls = [u for u in extract_all_urls(text)
+                if not any(h in u.lower() for h in NON_PRODUCT_HOSTS)]
     if not urls:
         # No link at all — nothing we can post. Keep the diagnostic skip.
         sig = reasons.get("signals", {})
