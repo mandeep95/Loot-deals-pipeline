@@ -1,0 +1,49 @@
+services:
+  # Wakes on incoming Telegram updates (forwards, button taps). Sleeps when idle.
+  - type: web
+    name: deals-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python webhook.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: DRAFT_CHAT_ID
+        sync: false
+      - key: DEALS_CHANNEL
+        value: "@lootdealsbydeep"
+      - key: AFFILIATE_PROVIDER
+        value: none
+      - key: EARNKARO_API_KEY
+        sync: false
+      - key: CUELINKS_API_KEY
+        sync: false
+      - key: MIN_DISCOUNT_PCT
+        value: 70
+      - key: WEBHOOK_URL
+        sync: false   # set to https://deals-bot.onrender.com after first deploy
+
+  # Polls source channels every 12 min, forwards loot matches, then exits.
+  - type: cron
+    name: deals-reader
+    runtime: python
+    schedule: "*/12 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python reader_cron.py
+    envVars:
+      - key: TG_API_ID
+        sync: false
+      - key: TG_API_HASH
+        sync: false
+      - key: READER_TARGET_CHAT
+        sync: false
+      - key: READER_SESSION_B64
+        sync: false   # from login.py (one-time, on your computer)
+      - key: SOURCE_CHANNELS
+        value: "@SharmaTec,@FRCP_Official,@tech24deals,@MagiXdeals,@icoolzTricks,@TrickXpert,-1001930195180"
+      - key: MIN_DISCOUNT_PCT
+        value: 70
+      - key: LOOT_KEYWORDS
+        value: "loot,price error,priceerror,glitch,steal deal,price drop,loot deal"
+      - key: MAX_FORWARDS_PER_RUN
+        value: 10
