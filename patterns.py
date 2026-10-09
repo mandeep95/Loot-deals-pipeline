@@ -100,6 +100,51 @@ def price_drop_pct(prices: list[float]) -> int | None:
     return round((hi - lo) / hi * 100)
 
 
+COUPON_RE = re.compile(r"₹\s*([\d,]+)\s*(?:off\s+)?coupon", re.IGNORECASE)
+
+
+def extract_coupon(text: str) -> float | None:
+    """'Apply ₹10,000 off Coupon' -> 10000.0"""
+    m = COUPON_RE.search(text or "")
+    return _to_float(m.group(1)) if m else None
+
+
+def cashback_amount(text: str) -> float | None:
+    """The rupee figure nearest the word 'cashback' — the cashback *amount*,
+    not the product price. None when no ₹ figure sits near the word."""
+    low = (text or "").lower()
+    idx = low.find("cashback")
+    if idx < 0:
+        return None
+    best, best_dist = None, None
+    for m in PRICE_RE.finditer(text):
+        dist = abs(m.start() - idx)
+        if best_dist is None or dist < best_dist:
+            best, best_dist = _to_float(m.group(1)), dist
+    return best
+
+
+def cashback_deal(text: str) -> tuple[float | None, float | None, int | None]:
+    """(price, cashback_amount, cashback_pct) for cashback messages.
+
+    'Extra ₹4,249 Cashback' on a ₹84,999 product = 5% cashback — the
+    ₹4,249 is money back, NOT a price drop to ₹4,249.
+    Returns (None, None, None) when not a cashback-with-amount message.
+    """
+    text = text or ""
+    if "cashback" not in text.lower():
+        return (None, None, None)
+    cb = cashback_amount(text)
+    prices = extract_prices(text)
+    if cb is None or not prices:
+        return (None, None, None)
+    others = [p for p in prices if p != cb]
+    price = max(others) if others else max(prices)
+    if price <= 0 or cb >= price:
+        return (None, None, None)
+    return (price, cb, round(cb / price * 100))
+
+
 def is_loot(text: str) -> tuple[bool, dict]:
     """Return (matched, reasons). Reasons explain WHY it matched (for the approval card)."""
     text = text or ""
@@ -115,9 +160,15 @@ def is_loot(text: str) -> tuple[bool, dict]:
     if pct is not None and pct >= min_discount_pct():
         reasons["explicit_pct"] = pct
 
-    drop = price_drop_pct(extract_prices(text))
-    if drop is not None and drop >= min_discount_pct():
-        reasons["price_drop_pct"] = drop
+    prices = extract_prices(text)
+    cb_price, cb_amt, cb_pct = cashback_deal(text)
+    if cb_pct is not None:
+        # Cashback deal: report the real cashback %, never a fake price drop.
+        reasons["cashback_pct"] = cb_pct
+    else:
+        drop = price_drop_pct(prices)
+        if drop is not None and drop >= min_discount_pct():
+            reasons["price_drop_pct"] = drop
 
     urls = extract_product_urls(text)
     if urls:
